@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <link rel="icon" href="logo.png" type="image/x-icon">
+  <title>Webhook Sender</title>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Syne:wght@400;700;800&display=swap" rel="stylesheet"/>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #0d0e11;
+      --surface:   #13151a;
+      --border:    #1e2128;
+      --border2:   #2a2d38;
+      --text:      #c9cdd6;
+      --muted:     #555c6e;
+      --accent:    #5865f2;
+      --accent-h:  #4752c4;
+      --green:     #3ba55c;
+      --red:       #ed4245;
+      --label:     #7289da;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'JetBrains Mono', monospace;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem 1rem;
+    }
+
+    /* Subtle grid background */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(var(--border) 1px, transparent 1px),
+        linear-gradient(90deg, var(--border) 1px, transparent 1px);
+      background-size: 40px 40px;
+      opacity: 0.4;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .wrapper {
+      position: relative;
+      z-index: 1;
+      width: 100%;
+      max-width: 560px;
+    }
+
+    header {
+      margin-bottom: 2.5rem;
+      text-align: center;
+    }
+
+    .logo {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.6rem;
+      margin-bottom: 0.75rem;
+    }
+
+    .logo svg {
+      width: 28px;
+      height: 28px;
+      fill: var(--accent);
+      filter: drop-shadow(0 0 8px rgba(88,101,242,0.5));
+    }
+
+    h1 {
+      font-family: 'Syne', sans-serif;
+      font-size: 1.5rem;
+      font-weight: 800;
+      color: #fff;
+      letter-spacing: -0.02em;
+    }
+
+    .subtitle {
+      font-size: 0.72rem;
+      color: var(--muted);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      margin-top: 0.25rem;
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border2);
+      border-radius: 12px;
+      padding: 2rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+      box-shadow: 0 8px 40px rgba(0,0,0,0.4);
+    }
+
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+    }
+
+    label {
+      font-size: 0.68rem;
+      font-weight: 500;
+      color: var(--label);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+
+    input, textarea {
+      background: var(--bg);
+      border: 1px solid var(--border2);
+      border-radius: 7px;
+      color: var(--text);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.82rem;
+      padding: 0.65rem 0.85rem;
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+      resize: none;
+      width: 100%;
+    }
+
+    input::placeholder, textarea::placeholder {
+      color: var(--muted);
+    }
+
+    input:focus, textarea:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(88,101,242,0.15);
+    }
+
+    textarea {
+      min-height: 130px;
+      line-height: 1.6;
+    }
+
+    .char-count {
+      font-size: 0.65rem;
+      color: var(--muted);
+      text-align: right;
+      margin-top: 0.15rem;
+    }
+
+    .char-count.warn { color: var(--red); }
+
+    .divider {
+      border: none;
+      border-top: 1px solid var(--border);
+    }
+
+    .btn {
+      background: var(--accent);
+      border: none;
+      border-radius: 7px;
+      color: #fff;
+      cursor: pointer;
+      font-family: 'Syne', sans-serif;
+      font-size: 0.9rem;
+      font-weight: 700;
+      letter-spacing: 0.03em;
+      padding: 0.75rem 1.5rem;
+      position: relative;
+      overflow: hidden;
+      transition: background 0.2s, transform 0.1s, box-shadow 0.2s;
+      width: 100%;
+    }
+
+    .btn:hover { background: var(--accent-h); box-shadow: 0 4px 20px rgba(88,101,242,0.35); }
+    .btn:active { transform: scale(0.98); }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+    .btn .btn-inner {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+    }
+
+    .spinner {
+      width: 16px; height: 16px;
+      border: 2px solid rgba(255,255,255,0.3);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      display: none;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .toast {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      border-radius: 8px;
+      font-size: 0.78rem;
+      padding: 0.7rem 1rem;
+      opacity: 0;
+      transform: translateY(6px);
+      transition: opacity 0.25s, transform 0.25s;
+      pointer-events: none;
+    }
+
+    .toast.show { opacity: 1; transform: translateY(0); pointer-events: auto; }
+    .toast.success { background: rgba(59,165,92,0.15); border: 1px solid rgba(59,165,92,0.3); color: var(--green); }
+    .toast.error   { background: rgba(237,66,69,0.12); border: 1px solid rgba(237,66,69,0.3); color: var(--red); }
+
+    .toast-dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .toast.success .toast-dot { background: var(--green); }
+    .toast.error   .toast-dot { background: var(--red); }
+
+    footer {
+      text-align: center;
+      font-size: 0.63rem;
+      color: var(--muted);
+      margin-top: 1.5rem;
+      letter-spacing: 0.04em;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrapper">
+    <header>
+      <div class="logo">
+        <img src="https://upload.wikimedia.org/wikipedia/fr/thumb/4/4f/Discord_Logo_sans_texte.svg/960px-Discord_Logo_sans_texte.svg.png" alt="Discord" style="width: 28px; height: 28px; filter: drop-shadow(0 0 8px rgba(88,101,242,0.5));" />
+        <h1>Webhook Sender</h1>
+      </div>
+      <p class="subtitle">Send messages to Discord channels</p>
+    </header>
+
+    <div class="card">
+      <div class="field">
+        <label>Webhook URL</label>
+        <input type="text" id="webhookUrl" placeholder="https://discord.com/api/webhooks/..." autocomplete="off" spellcheck="false"/>
+      </div>
+
+      <div class="field">
+        <label>Bot Username <span style="color:var(--muted);font-size:.6rem">(optional)</span></label>
+        <input type="text" id="username" placeholder="My Bot" maxlength="80"/>
+      </div>
+
+      <hr class="divider"/>
+
+      <div class="field">
+        <label>Message</label>
+        <textarea id="message" placeholder="Type your message here..." maxlength="2000"></textarea>
+        <div class="char-count" id="charCount">0 / 2000</div>
+      </div>
+
+      <div class="toast" id="toast">
+        <div class="toast-dot"></div>
+        <span id="toastMsg"></span>
+      </div>
+
+      <button class="btn" id="sendBtn" onclick="sendWebhook()">
+        <div class="btn-inner">
+          <div class="spinner" id="spinner"></div>
+          <span id="btnLabel">Send Message</span>
+        </div>
+      </button>
+    </div>
+
+    <footer>Messages are sent directly to Discord — nothing is stored or logged.</footer>
+  </div>
+
+  <script>
+    const msgEl   = document.getElementById('message');
+    const countEl = document.getElementById('charCount');
+
+    msgEl.addEventListener('input', () => {
+      const len = msgEl.value.length;
+      countEl.textContent = `${len} / 2000`;
+      countEl.classList.toggle('warn', len > 1800);
+    });
+
+    function showToast(type, msg) {
+      const toast = document.getElementById('toast');
+      const toastMsg = document.getElementById('toastMsg');
+      toast.className = `toast ${type} show`;
+      toastMsg.textContent = msg;
+      setTimeout(() => { toast.classList.remove('show'); }, 4000);
+    }
+
+    function setLoading(on) {
+      const btn     = document.getElementById('sendBtn');
+      const spinner = document.getElementById('spinner');
+      const label   = document.getElementById('btnLabel');
+      btn.disabled        = on;
+      spinner.style.display = on ? 'block' : 'none';
+      label.textContent   = on ? 'Sending…' : 'Send Message';
+    }
+
+    // Load webhook URL from localStorage on page load
+    window.addEventListener('DOMContentLoaded', () => {
+      const savedUrl = localStorage.getItem('webhookUrl');
+      if (savedUrl) {
+        document.getElementById('webhookUrl').value = savedUrl;
+      }
+    });
+
+    // Save webhook URL to localStorage on input change
+    document.getElementById('webhookUrl').addEventListener('change', (e) => {
+      if (e.target.value.trim()) {
+        localStorage.setItem('webhookUrl', e.target.value.trim());
+      }
+    });
+
+    async function sendWebhook() {
+      const url      = document.getElementById('webhookUrl').value.trim();
+      const username = document.getElementById('username').value.trim();
+      const content  = document.getElementById('message').value.trim();
+
+      if (!url) return showToast('error', 'Please enter a webhook URL.');
+      if (!url.startsWith('https://discord.com/api/webhooks/'))
+        return showToast('error', 'URL must start with https://discord.com/api/webhooks/');
+      if (!content) return showToast('error', 'Message cannot be empty.');
+
+      const payload = { content };
+      if (username) payload.username = username;
+
+      setLoading(true);
+      try {
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+
+        if (res.ok || res.status === 204) {
+          showToast('success', 'Message sent successfully!');
+          document.getElementById('message').value = '';
+          countEl.textContent = '0 / 2000';
+          countEl.classList.remove('warn');
+        } else {
+          const err = await res.json().catch(() => ({}));
+          showToast('error', err.message || `Error ${res.status} — check your webhook URL.`);
+        }
+      } catch (e) {
+        showToast('error', 'Network error — could not reach Discord.');
+      } finally {
+        setLoading(false);
+      }
+    }
+  </script>
+</body>
+</html>
