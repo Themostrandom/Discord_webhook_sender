@@ -1,358 +1,590 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <link rel="icon" href="logo.png" type="image/x-icon">
-  <title>Webhook Sender</title>
-  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Syne:wght@400;700;800&display=swap" rel="stylesheet"/>
-  <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Upload my screenshots and video</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Semi+Condensed:wght@600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #171c2c;
+    --panel: #212840;
+    --panel-2: #2a3352;
+    --line: #3a4566;
+    --text: #eceff8;
+    --muted: #a0a9c3;
+    --accent: #ffb84d;
+    --accent-ink: #231800;
+    --ok: #58d6b0;
+    --err: #ff7a7a;
+    --radius: 10px;
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font: 400 16px/1.55 "Barlow", system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  main { max-width: 640px; margin: 0 auto; padding: 48px 20px 96px; }
+  h1 {
+    margin: 0 0 12px;
+    font: 700 clamp(2rem, 6vw, 2.9rem)/1.05 "Barlow Semi Condensed", "Barlow", system-ui, sans-serif;
+    letter-spacing: .005em;
+  }
+  .lead { margin: 0 0 36px; color: var(--muted); max-width: 52ch; }
+  fieldset { border: 0; margin: 0; padding: 0; min-width: 0; }
+  .field { margin-bottom: 30px; }
+  .title { display: flex; align-items: baseline; gap: 10px; margin-bottom: 8px; font-weight: 600; }
+  .count { color: var(--muted); font-weight: 400; font-size: .9rem; }
+  .hint { margin: 8px 0 0; color: var(--muted); font-size: .9rem; max-width: 60ch; }
+  .note { margin: 8px 0 0; color: var(--err); font-size: .9rem; min-height: 0; }
+  .note:empty { display: none; }
 
-    :root {
-      --bg:        #0d0e11;
-      --surface:   #13151a;
-      --border:    #1e2128;
-      --border2:   #2a2d38;
-      --text:      #c9cdd6;
-      --muted:     #555c6e;
-      --accent:    #5865f2;
-      --accent-h:  #4752c4;
-      --green:     #3ba55c;
-      --red:       #ed4245;
-      --label:     #7289da;
-    }
+  input[type=text] {
+    width: 100%;
+    padding: 12px 14px;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    color: var(--text);
+    font: inherit;
+  }
+  input[type=text]:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
-    body {
-      background: var(--bg);
-      color: var(--text);
-      font-family: 'JetBrains Mono', monospace;
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      padding: 2rem 1rem;
-    }
+  .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .drop {
+    position: relative;
+    display: flex; flex-direction: column; gap: 2px;
+    padding: 18px 20px;
+    background: var(--panel);
+    border: 1.5px dashed var(--line);
+    border-radius: var(--radius);
+    cursor: pointer;
+    transition: border-color .15s, background .15s;
+  }
+  .drop span { color: var(--muted); font-size: .92rem; }
+  .drop:hover, .drop.over { border-color: var(--accent); background: var(--panel-2); }
+  .drop:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
 
-    /* Subtle grid background */
-    body::before {
-      content: '';
-      position: fixed;
-      inset: 0;
-      background-image:
-        linear-gradient(var(--border) 1px, transparent 1px),
-        linear-gradient(90deg, var(--border) 1px, transparent 1px);
-      background-size: 40px 40px;
-      opacity: 0.4;
-      pointer-events: none;
-      z-index: 0;
-    }
+  .thumbs { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 10px; margin-top: 12px; }
+  .thumbs:empty { display: none; }
+  .thumb { position: relative; aspect-ratio: 1; border-radius: 8px; overflow: hidden; background: var(--panel-2); }
+  .thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .thumb button {
+    position: absolute; top: 6px; right: 6px;
+    width: 26px; height: 26px; padding: 0;
+    border: 0; border-radius: 50%;
+    background: rgba(10, 12, 24, .78); color: #fff;
+    font-size: 16px; line-height: 1; cursor: pointer;
+  }
+  .thumb button:focus-visible { outline: 2px solid var(--accent); }
+  .thumb .size {
+    position: absolute; left: 6px; bottom: 6px;
+    padding: 1px 6px; border-radius: 4px;
+    background: rgba(10, 12, 24, .78); font-size: .72rem;
+  }
 
-    .wrapper {
-      position: relative;
-      z-index: 1;
-      width: 100%;
-      max-width: 560px;
-    }
+  .video-card {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    margin-top: 12px; padding: 12px 14px;
+    background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius);
+  }
+  .video-card .name { font-weight: 500; overflow-wrap: anywhere; }
+  .video-card .meta { color: var(--muted); font-size: .9rem; }
+  .video-card button, .linklike {
+    flex: none; padding: 6px 12px;
+    background: transparent; color: var(--text);
+    border: 1px solid var(--line); border-radius: 8px;
+    font: inherit; font-size: .9rem; cursor: pointer;
+  }
+  .video-card button:hover { border-color: var(--accent); }
+  .video-card button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
-    header {
-      margin-bottom: 2.5rem;
-      text-align: center;
-    }
+  .primary {
+    padding: 14px 26px;
+    background: var(--accent); color: var(--accent-ink);
+    border: 0; border-radius: var(--radius);
+    font: 600 1.05rem "Barlow", system-ui, sans-serif;
+    cursor: pointer;
+  }
+  .primary:hover { filter: brightness(1.06); }
+  .primary:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
+  .primary:disabled { opacity: .55; cursor: progress; }
 
-    .logo {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.6rem;
-      margin-bottom: 0.75rem;
-    }
-
-    .logo svg {
-      width: 28px;
-      height: 28px;
-      fill: var(--accent);
-      filter: drop-shadow(0 0 8px rgba(88,101,242,0.5));
-    }
-
-    h1 {
-      font-family: 'Syne', sans-serif;
-      font-size: 1.5rem;
-      font-weight: 800;
-      color: #fff;
-      letter-spacing: -0.02em;
-    }
-
-    .subtitle {
-      font-size: 0.72rem;
-      color: var(--muted);
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      margin-top: 0.25rem;
-    }
-
-    .card {
-      background: var(--surface);
-      border: 1px solid var(--border2);
-      border-radius: 12px;
-      padding: 2rem;
-      display: flex;
-      flex-direction: column;
-      gap: 1.25rem;
-      box-shadow: 0 8px 40px rgba(0,0,0,0.4);
-    }
-
-    .field {
-      display: flex;
-      flex-direction: column;
-      gap: 0.4rem;
-    }
-
-    label {
-      font-size: 0.68rem;
-      font-weight: 500;
-      color: var(--label);
-      letter-spacing: 0.1em;
-      text-transform: uppercase;
-    }
-
-    input, textarea {
-      background: var(--bg);
-      border: 1px solid var(--border2);
-      border-radius: 7px;
-      color: var(--text);
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 0.82rem;
-      padding: 0.65rem 0.85rem;
-      outline: none;
-      transition: border-color 0.2s, box-shadow 0.2s;
-      resize: none;
-      width: 100%;
-    }
-
-    input::placeholder, textarea::placeholder {
-      color: var(--muted);
-    }
-
-    input:focus, textarea:focus {
-      border-color: var(--accent);
-      box-shadow: 0 0 0 3px rgba(88,101,242,0.15);
-    }
-
-    textarea {
-      min-height: 130px;
-      line-height: 1.6;
-    }
-
-    .char-count {
-      font-size: 0.65rem;
-      color: var(--muted);
-      text-align: right;
-      margin-top: 0.15rem;
-    }
-
-    .char-count.warn { color: var(--red); }
-
-    .divider {
-      border: none;
-      border-top: 1px solid var(--border);
-    }
-
-    .btn {
-      background: var(--accent);
-      border: none;
-      border-radius: 7px;
-      color: #fff;
-      cursor: pointer;
-      font-family: 'Syne', sans-serif;
-      font-size: 0.9rem;
-      font-weight: 700;
-      letter-spacing: 0.03em;
-      padding: 0.75rem 1.5rem;
-      position: relative;
-      overflow: hidden;
-      transition: background 0.2s, transform 0.1s, box-shadow 0.2s;
-      width: 100%;
-    }
-
-    .btn:hover { background: var(--accent-h); box-shadow: 0 4px 20px rgba(88,101,242,0.35); }
-    .btn:active { transform: scale(0.98); }
-    .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
-
-    .btn .btn-inner {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 0.5rem;
-    }
-
-    .spinner {
-      width: 16px; height: 16px;
-      border: 2px solid rgba(255,255,255,0.3);
-      border-top-color: #fff;
-      border-radius: 50%;
-      animation: spin 0.7s linear infinite;
-      display: none;
-    }
-    @keyframes spin { to { transform: rotate(360deg); } }
-
-    .toast {
-      display: flex;
-      align-items: center;
-      gap: 0.6rem;
-      border-radius: 8px;
-      font-size: 0.78rem;
-      padding: 0.7rem 1rem;
-      opacity: 0;
-      transform: translateY(6px);
-      transition: opacity 0.25s, transform 0.25s;
-      pointer-events: none;
-    }
-
-    .toast.show { opacity: 1; transform: translateY(0); pointer-events: auto; }
-    .toast.success { background: rgba(59,165,92,0.15); border: 1px solid rgba(59,165,92,0.3); color: var(--green); }
-    .toast.error   { background: rgba(237,66,69,0.12); border: 1px solid rgba(237,66,69,0.3); color: var(--red); }
-
-    .toast-dot {
-      width: 7px; height: 7px;
-      border-radius: 50%;
-      flex-shrink: 0;
-    }
-    .toast.success .toast-dot { background: var(--green); }
-    .toast.error   .toast-dot { background: var(--red); }
-
-    footer {
-      text-align: center;
-      font-size: 0.63rem;
-      color: var(--muted);
-      margin-top: 1.5rem;
-      letter-spacing: 0.04em;
-    }
-  </style>
+  .bar { height: 6px; margin-top: 26px; background: var(--panel); border-radius: 3px; overflow: hidden; }
+  .bar div { height: 100%; width: 0; background: var(--accent); transition: width .25s; }
+  .log { list-style: none; margin: 18px 0 0; padding: 0; display: grid; gap: 8px; }
+  .log li { display: flex; gap: 10px; align-items: flex-start; color: var(--muted); font-size: .95rem; }
+  .log li::before {
+    content: ""; flex: none; width: 10px; height: 10px; margin-top: 7px;
+    border-radius: 50%; background: var(--line);
+  }
+  .log li.working { color: var(--text); }
+  .log li.working::before { background: var(--accent); animation: pulse 1s ease-in-out infinite; }
+  .log li.done { color: var(--text); }
+  .log li.done::before { background: var(--ok); }
+  .log li.warn { color: var(--accent); }
+  .log li.warn::before { background: var(--accent); }
+  .log li.error { color: var(--err); }
+  .log li.error::before { background: var(--err); }
+  @keyframes pulse { 50% { opacity: .35; } }
+  @media (prefers-reduced-motion: reduce) {
+    * { animation: none !important; transition: none !important; }
+  }
+</style>
 </head>
 <body>
-  <div class="wrapper">
-    <header>
-      <div class="logo">
-        <img src="https://upload.wikimedia.org/wikipedia/fr/thumb/4/4f/Discord_Logo_sans_texte.svg/960px-Discord_Logo_sans_texte.svg.png" alt="Discord" style="width: 28px; height: 28px; filter: drop-shadow(0 0 8px rgba(88,101,242,0.5));" />
-        <h1>Webhook Sender</h1>
-      </div>
-      <p class="subtitle">Send messages to Discord channels</p>
-    </header>
+<main>
+  <h1>Upload your screenshots and video</h1>
+  <p class="lead">Add up to 10 images and a 1-minute video maximum. They will be sent directly to Discord.</p>
 
-    <div class="card">
+  <form id="form" novalidate>
+    <fieldset id="fs">
       <div class="field">
-        <label>Webhook URL</label>
-        <input type="text" id="webhookUrl" placeholder="https://discord.com/api/webhooks/..." autocomplete="off" spellcheck="false"/>
+        <label class="title" for="pseudo">In-game username</label>
+        <input id="pseudo" type="text" maxlength="32" autocomplete="nickname" required>
+        <p class="hint">Type it exactly as it appears in-game.</p>
       </div>
 
       <div class="field">
-        <label>Bot Username <span style="color:var(--muted);font-size:.6rem">(optional)</span></label>
-        <input type="text" id="username" placeholder="My Bot" maxlength="80"/>
+        <div class="title">Images <span class="count" id="imgCount">0/10</span></div>
+        <label class="drop" id="imgDrop">
+          <input class="sr" id="imgInput" type="file" accept="image/png,image/jpeg,image/webp,image/gif" multiple>
+          <strong>Choose images</strong>
+          <span>or drop them here (PNG, JPG, WebP, or GIF)</span>
+        </label>
+        <p class="note" id="imgNote" role="status"></p>
+        <div class="thumbs" id="thumbs"></div>
       </div>
-
-      <hr class="divider"/>
 
       <div class="field">
-        <label>Message</label>
-        <textarea id="message" placeholder="Type your message here..." maxlength="2000"></textarea>
-        <div class="char-count" id="charCount">0 / 2000</div>
-      </div>
-
-      <div class="toast" id="toast">
-        <div class="toast-dot"></div>
-        <span id="toastMsg"></span>
-      </div>
-
-      <button class="btn" id="sendBtn" onclick="sendWebhook()">
-        <div class="btn-inner">
-          <div class="spinner" id="spinner"></div>
-          <span id="btnLabel">Send Message</span>
+        <div class="title">Video</div>
+        <label class="drop" id="vidDrop">
+          <input class="sr" id="vidInput" type="file" accept="video/*">
+          <strong>Choose a video</strong>
+          <span>or drop it here (1 minute max)</span>
+        </label>
+        <p class="note" id="vidNote" role="status"></p>
+        <div class="video-card" id="vidCard" hidden>
+          <div>
+            <div class="name" id="vidName"></div>
+            <div class="meta" id="vidMeta"></div>
+          </div>
+          <button type="button" id="vidRemove">Remove</button>
         </div>
-      </button>
-    </div>
+        <p class="hint">If over 9 MB, the video will automatically be split into clips of 9 MB maximum.</p>
+      </div>
 
-    <footer>Messages are sent directly to Discord — nothing is stored or logged.</footer>
-  </div>
+      <button class="primary" id="send" type="submit">Submit</button>
+      <p class="note" id="formNote" role="alert"></p>
+    </fieldset>
+  </form>
 
-  <script>
-    const msgEl   = document.getElementById('message');
-    const countEl = document.getElementById('charCount');
+  <div class="bar" id="bar" hidden><div id="barFill"></div></div>
+  <ul class="log" id="log" aria-live="polite"></ul>
+</main>
 
-    msgEl.addEventListener('input', () => {
-      const len = msgEl.value.length;
-      countEl.textContent = `${len} / 2000`;
-      countEl.classList.toggle('warn', len > 1800);
-    });
+<script>
+"use strict";
 
-    function showToast(type, msg) {
-      const toast = document.getElementById('toast');
-      const toastMsg = document.getElementById('toastMsg');
-      toast.className = `toast ${type} show`;
-      toastMsg.textContent = msg;
-      setTimeout(() => { toast.classList.remove('show'); }, 4000);
-    }
+/* ------------------------------------------------------------------ */
+/*  Settings                                                           */
+/* ------------------------------------------------------------------ */
+const WEBHOOK_URL = "https://discord.com/api/webhooks/1552729680346484786/snyOHlO_c0S7JdatVSa8Dt1Aa3vPIQ8dQhjHR9g6KUzeFYCCNt-DMC70N6HUQvr6syPP";
 
-    function setLoading(on) {
-      const btn     = document.getElementById('sendBtn');
-      const spinner = document.getElementById('spinner');
-      const label   = document.getElementById('btnLabel');
-      btn.disabled        = on;
-      spinner.style.display = on ? 'block' : 'none';
-      label.textContent   = on ? 'Sending…' : 'Send Message';
-    }
+const CONFIG = {
+  maxImages: 10,
+  maxVideoSeconds: 60,
+  maxBytes: 9 * 1024 * 1024,          // Maximum size per file upload (9 MB)
+  targetBytes: Math.floor(8.4 * 1024 * 1024), // Target size to keep a safety margin
+  maxVideoBytes: 400 * 1024 * 1024,   // Maximum original video file size
+  ffmpegJs:   "https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.10/dist/umd/ffmpeg.js",
+  ffmpegWorker: "https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.10/dist/umd/814.ffmpeg.js",
+  ffmpegUtil: "https://cdn.jsdelivr.net/npm/@ffmpeg/util@0.12.1/dist/umd/index.js",
+  ffmpegCore: "https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/umd"
+};
 
-    // Load webhook URL from localStorage on page load
-    window.addEventListener('DOMContentLoaded', () => {
-      const savedUrl = localStorage.getItem('webhookUrl');
-      if (savedUrl) {
-        document.getElementById('webhookUrl').value = savedUrl;
+/* ------------------------------------------------------------------ */
+/*  Utilities                                                         */
+/* ------------------------------------------------------------------ */
+const $ = (s) => document.querySelector(s);
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const pad2 = (n) => String(n).padStart(2, "0");
+const escapeMd = (s) => s.replace(/([\\*_~`|>])/g, "\\$1");
+const safeName = (s) => s.replace(/[^\w.\-]+/g, "_");
+const baseName = (s) => {
+  const nameWithoutExt = s.replace(/\.\w+$/, "");
+  return safeName(nameWithoutExt).replace(/^_+|_+$/g, "") || "file";
+};
+const extOf = (s) => (s.match(/\.(\w+)$/) || [, "mp4"])[1].toLowerCase();
+const fmtSize = (b) => b >= 1048576 ? (b / 1048576).toFixed(1) + " MB" : Math.max(1, Math.round(b / 1024)) + " KB";
+const fmtDuration = (s) => s >= 60 ? "1 min" : Math.round(s) + " s";
+const setNote = (id, text) => { $("#" + id).textContent = text || ""; };
+
+const state = { images: [], video: null, busy: false };
+
+function loadScript(src) {
+  return new Promise((resolve, reject) => {
+    const s = document.createElement("script");
+    s.src = src;
+    s.onload = resolve;
+    s.onerror = () => reject(new Error("Unable to load: " + src));
+    document.head.append(s);
+  });
+}
+
+/* ------------------------------------------------------------------ */
+/*  Images                                                            */
+/* ------------------------------------------------------------------ */
+function addImages(list) {
+  if (state.busy) return;
+  const problems = new Set();
+  for (const f of list) {
+    if (!/^image\/(png|jpe?g|webp|gif)$/.test(f.type)) { problems.add(`"${f.name}" is not a supported format.`); continue; }
+    if (state.images.length >= CONFIG.maxImages) { problems.add(`Maximum ${CONFIG.maxImages} images.`); break; }
+    const dup = state.images.some((i) => i.file.name === f.name && i.file.size === f.size && i.file.lastModified === f.lastModified);
+    if (dup) continue;
+    state.images.push({ file: f, url: URL.createObjectURL(f) });
+  }
+  setNote("imgNote", [...problems].join(" "));
+  renderImages();
+}
+
+function renderImages() {
+  const box = $("#thumbs");
+  box.replaceChildren();
+  for (const it of state.images) {
+    const d = document.createElement("div");
+    d.className = "thumb";
+    const img = document.createElement("img");
+    img.src = it.url; img.alt = it.file.name;
+    const b = document.createElement("button");
+    b.type = "button"; b.textContent = "×";
+    b.setAttribute("aria-label", "Remove " + it.file.name);
+    b.onclick = () => {
+      if (state.busy) return;
+      URL.revokeObjectURL(it.url);
+      state.images.splice(state.images.indexOf(it), 1);
+      setNote("imgNote", "");
+      renderImages();
+    };
+    const s = document.createElement("span");
+    s.className = "size"; s.textContent = fmtSize(it.file.size);
+    d.append(img, b, s);
+    box.append(d);
+  }
+  $("#imgCount").textContent = `${state.images.length}/${CONFIG.maxImages}`;
+}
+
+// Compress oversized images to stay under the payload limit.
+async function prepareImage(file) {
+  if (file.size <= CONFIG.maxBytes) return file;
+  const bmp = await createImageBitmap(file);
+  let scale = Math.min(1, 3840 / Math.max(bmp.width, bmp.height));
+  for (let i = 0; i < 8; i++) {
+    const c = document.createElement("canvas");
+    c.width = Math.round(bmp.width * scale);
+    c.height = Math.round(bmp.height * scale);
+    const ctx = c.getContext("2d");
+    ctx.fillStyle = "#fff";
+    ctx.fillRect(0, 0, c.width, c.height);
+    ctx.drawImage(bmp, 0, 0, c.width, c.height);
+    for (const q of [0.9, 0.8, 0.7, 0.6]) {
+      const blob = await new Promise((r) => c.toBlob(r, "image/jpeg", q));
+      if (blob && blob.size <= CONFIG.targetBytes) {
+        return new File([blob], baseName(file.name) + ".jpg", { type: "image/jpeg" });
       }
-    });
-
-    // Save webhook URL to localStorage on input change
-    document.getElementById('webhookUrl').addEventListener('change', (e) => {
-      if (e.target.value.trim()) {
-        localStorage.setItem('webhookUrl', e.target.value.trim());
-      }
-    });
-
-    async function sendWebhook() {
-      const url      = document.getElementById('webhookUrl').value.trim();
-      const username = document.getElementById('username').value.trim();
-      const content  = document.getElementById('message').value.trim();
-
-      if (!url) return showToast('error', 'Please enter a webhook URL.');
-      if (!url.startsWith('https://discord.com/api/webhooks/'))
-        return showToast('error', 'URL must start with https://discord.com/api/webhooks/');
-      if (!content) return showToast('error', 'Message cannot be empty.');
-
-      const payload = { content };
-      if (username) payload.username = username;
-
-      setLoading(true);
-      try {
-        const res = await fetch(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-        });
-
-        if (res.ok || res.status === 204) {
-          showToast('success', 'Message sent successfully!');
-          document.getElementById('message').value = '';
-          countEl.textContent = '0 / 2000';
-          countEl.classList.remove('warn');
-        } else {
-          const err = await res.json().catch(() => ({}));
-          showToast('error', err.message || `Error ${res.status} — check your webhook URL.`);
-        }
-      } catch (e) {
-        showToast('error', 'Network error — could not reach Discord.');
-      } finally {
-        setLoading(false);
-      }
     }
-  </script>
+    scale *= 0.75;
+  }
+  throw new Error(`Could not reduce "${file.name}" below ${fmtSize(CONFIG.maxBytes)}.`);
+}
+
+// Group files into batches: max 10 files per payload, max 9 MB total per payload.
+function makeBatches(files) {
+  const out = [];
+  let cur = [], size = 0;
+  for (const f of files) {
+    if (cur.length && (cur.length >= 10 || size + f.size > CONFIG.maxBytes)) { out.push(cur); cur = []; size = 0; }
+    cur.push(f); size += f.size;
+  }
+  if (cur.length) out.push(cur);
+  return out;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Video                                                             */
+/* ------------------------------------------------------------------ */
+function getDuration(file) {
+  return new Promise((resolve, reject) => {
+    const v = document.createElement("video");
+    v.preload = "metadata";
+    v.onloadedmetadata = () => { URL.revokeObjectURL(v.src); resolve(v.duration); };
+    v.onerror = () => { URL.revokeObjectURL(v.src); reject(new Error("Your browser cannot play this video. Try an MP4 or WebM file.")); };
+    v.src = URL.createObjectURL(file);
+  });
+}
+
+async function setVideo(files) {
+  if (state.busy) return;
+  const f = files && files[0];
+  if (!f) return;
+  setNote("vidNote", "");
+  if (!f.type.startsWith("video/")) return setNote("vidNote", "This file is not a video.");
+  if (f.size > CONFIG.maxVideoBytes) return setNote("vidNote", `Video is too large (${fmtSize(f.size)}). Maximum is ${fmtSize(CONFIG.maxVideoBytes)}.`);
+  let duration;
+  try { duration = await getDuration(f); } catch (e) { return setNote("vidNote", e.message); }
+  if (!isFinite(duration)) return setNote("vidNote", "Unreadable video duration.");
+  if (duration > CONFIG.maxVideoSeconds + 0.5) return setNote("vidNote", `Video is too long (${Math.round(duration)} s). Maximum is ${CONFIG.maxVideoSeconds} s.`);
+  state.video = { file: f, duration };
+  renderVideo();
+}
+
+function renderVideo() {
+  const v = state.video;
+  $("#vidCard").hidden = !v;
+  if (!v) return;
+  $("#vidName").textContent = v.file.name;
+  const parts = Math.ceil(v.file.size / CONFIG.targetBytes);
+  $("#vidMeta").textContent = `${fmtDuration(v.duration)}, ${fmtSize(v.file.size)}` +
+    (parts > 1 ? `, will be split into approx. ${parts} parts` : ", will be sent as is");
+}
+
+/* Splitting via ffmpeg.wasm (loaded on demand) */
+let ffmpegPromise = null;
+function getFFmpeg() {
+  if (!ffmpegPromise) {
+    ffmpegPromise = (async () => {
+      await loadScript(CONFIG.ffmpegJs);
+      await loadScript(CONFIG.ffmpegUtil);
+      const { FFmpeg } = window.FFmpegWASM;
+      const { toBlobURL } = window.FFmpegUtil;
+      const ff = new FFmpeg();
+      await ff.load({
+        classWorkerURL: await toBlobURL(CONFIG.ffmpegWorker, "text/javascript"),
+        coreURL: await toBlobURL(CONFIG.ffmpegCore + "/ffmpeg-core.js", "text/javascript"),
+        wasmURL: await toBlobURL(CONFIG.ffmpegCore + "/ffmpeg-core.wasm", "application/wasm")
+      });
+      return ff;
+    })().catch((e) => { ffmpegPromise = null; throw e; });
+  }
+  return ffmpegPromise;
+}
+
+async function listSegments(ff) {
+  const list = await ff.listDir("/");
+  return list.filter((n) => !n.isDir && /^seg_\d+\.mp4$/.test(n.name)).map((n) => n.name).sort();
+}
+async function clearSegments(ff) {
+  for (const n of await listSegments(ff)) { try { await ff.deleteFile(n); } catch (_) {} }
+}
+async function readSegments(ff, originalName) {
+  const names = await listSegments(ff);
+  const base = baseName(originalName);
+  const out = [];
+  for (let i = 0; i < names.length; i++) {
+    const data = await ff.readFile(names[i]);
+    out.push(new File([data], `${base}_part${pad2(i + 1)}.mp4`, { type: "video/mp4" }));
+  }
+  return out;
+}
+
+async function splitWithFFmpeg(ff, file, duration, setText) {
+  const input = "input." + extOf(file.name);
+  await ff.writeFile(input, await window.FFmpegUtil.fetchFile(file));
+  const onProgress = ({ progress }) => {
+    if (progress > 0 && progress <= 1) setText(`Re-encoding video: ${Math.round(progress * 100)}%`);
+  };
+  ff.on("progress", onProgress);
+  try {
+    // 1) Fast stream-copy split (cuts on keyframes)
+    let segTime = Math.max(1, Math.floor(duration * CONFIG.targetBytes / file.size));
+    for (let attempt = 0; attempt < 2; attempt++) {
+      setText(`Splitting video (clips of approx. ${segTime}s)…`);
+      await clearSegments(ff);
+      const code = await ff.exec([
+        "-i", input, "-map", "0:v:0", "-map", "0:a:0?", "-c", "copy",
+        "-f", "segment", "-segment_time", String(segTime), "-reset_timestamps", "1", "seg_%03d.mp4"
+      ]);
+      const parts = await readSegments(ff, file.name);
+      if (code === 0 && parts.length && parts.every((p) => p.size > 0 && p.size <= CONFIG.maxBytes)) return parts;
+      segTime = Math.max(1, Math.floor(segTime * 0.6));
+    }
+    // 2) Re-encode fallback: 10s segments capped under size limits
+    setText("Re-encoding video (this may take a few minutes)…");
+    await clearSegments(ff);
+    const code = await ff.exec([
+      "-i", input, "-map", "0:v:0", "-map", "0:a:0?",
+      "-vf", "scale='min(1920,iw)':-2",
+      "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p",
+      "-b:v", "5000k", "-maxrate", "5500k", "-bufsize", "5500k",
+      "-c:a", "aac", "-b:a", "96k",
+      "-force_key_frames", "expr:gte(t,n_forced*10)",
+      "-f", "segment", "-segment_time", "10", "-reset_timestamps", "1", "seg_%03d.mp4"
+    ]);
+    const parts = await readSegments(ff, file.name);
+    if (code !== 0 || !parts.length || parts.some((p) => p.size > CONFIG.maxBytes)) throw new Error("Splitting failed.");
+    return parts;
+  } finally {
+    ff.off("progress", onProgress);
+    try { await ff.deleteFile(input); } catch (_) {}
+    await clearSegments(ff);
+  }
+}
+
+// Raw chunk fallback: split raw bytes if FFmpeg fails (must be reassembled manually).
+function rawSplit(file) {
+  const parts = [];
+  const base = baseName(file.name), ext = extOf(file.name);
+  for (let o = 0, i = 1; o < file.size; o += CONFIG.targetBytes, i++) {
+    parts.push(new File([file.slice(o, o + CONFIG.targetBytes)], `${base}.${ext}.part${pad2(i)}`, { type: "application/octet-stream" }));
+  }
+  return parts;
+}
+
+async function prepareVideo(file, duration, setText) {
+  if (file.size <= CONFIG.maxBytes) return { parts: [file], raw: false };
+  try {
+    setText("Loading splitting tool…");
+    const ff = await getFFmpeg();
+    return { parts: await splitWithFFmpeg(ff, file, duration, setText), raw: false };
+  } catch (err) {
+    console.error(err);
+    return { parts: rawSplit(file), raw: true };
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/*  Discord Upload                                                    */
+/* ------------------------------------------------------------------ */
+async function postToDiscord(content, files) {
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const fd = new FormData();
+    fd.append("payload_json", JSON.stringify({ content, allowed_mentions: { parse: [] } }));
+    files.forEach((f, i) => fd.append(`files[${i}]`, f, f.name));
+    const res = await fetch(WEBHOOK_URL, { method: "POST", body: fd });
+    if (res.ok) return;
+    if (res.status === 429) {
+      const j = await res.json().catch(() => ({}));
+      await sleep(((j.retry_after || 2) + 0.5) * 1000);
+      continue;
+    }
+    if (res.status === 413) throw new Error("A file exceeds Discord's upload size limit.");
+    throw new Error(`Discord rejected the upload (code ${res.status}).`);
+  }
+  throw new Error("Discord rate limit reached. Try again in a minute.");
+}
+
+async function run(pseudo) {
+  const imgs = state.images.map((i) => i.file);
+  const vid = state.video;
+  const name = escapeMd(pseudo);
+  const log = $("#log");
+  log.replaceChildren();
+  $("#bar").hidden = false;
+
+  let total = (imgs.length ? 1 + Math.ceil(imgs.length / 10) : 0) + (vid ? 2 : 0);
+  let done = 0;
+  const paint = () => { $("#barFill").style.width = Math.min(100, Math.round((done / total) * 100)) + "%"; };
+  const tick = () => { done++; paint(); };
+  const step = (text) => { const li = document.createElement("li"); li.className = "working"; li.textContent = text; log.append(li); return li; };
+  const mark = (li, cls, text) => { li.className = cls; if (text) li.textContent = text; };
+  const suffix = (i, n) => (n > 1 ? ` (${i + 1}/${n})` : "");
+  paint();
+
+  if (imgs.length) {
+    let li = step("Preparing images…");
+    const files = [];
+    for (const f of imgs) files.push(await prepareImage(f));
+    mark(li, "done", "Images ready");
+    tick();
+    const batches = makeBatches(files);
+    total += batches.length - Math.ceil(imgs.length / 10);
+    for (let i = 0; i < batches.length; i++) {
+      li = step("Uploading images" + suffix(i, batches.length) + "…");
+      await postToDiscord(`📸 **${name}** — images${suffix(i, batches.length)}`, batches[i]);
+      mark(li, "done", "Images uploaded" + suffix(i, batches.length));
+      tick();
+    }
+  }
+
+  if (vid) {
+    let li = step("Preparing video…");
+    const { parts, raw } = await prepareVideo(vid.file, vid.duration, (t) => { li.textContent = t; });
+    mark(li, "done", parts.length > 1 ? `Video split into ${parts.length} parts` : "Video ready");
+    tick();
+    total += parts.length - 1;
+    if (raw) {
+      const w = step("Interactive video splitter failed to load: sending as raw file chunks (must be reassembled).");
+      mark(w, "warn");
+    }
+    for (let i = 0; i < parts.length; i++) {
+      li = step("Uploading video" + suffix(i, parts.length) + "…");
+      const label = parts.length > 1 ? `, ${raw ? "raw chunk " : "part "}${i + 1}/${parts.length}` : "";
+      await postToDiscord(`🎬 **${name}** — video${label}`, [parts[i]]);
+      mark(li, "done", "Video uploaded" + suffix(i, parts.length));
+      tick();
+    }
+  }
+
+  const ok = step("All files uploaded. Thank you!");
+  mark(ok, "done");
+}
+
+/* ------------------------------------------------------------------ */
+/*  Event Listeners                                                   */
+/* ------------------------------------------------------------------ */
+function wireDrop(zone, handler) {
+  ["dragenter", "dragover"].forEach((ev) => zone.addEventListener(ev, (e) => { e.preventDefault(); zone.classList.add("over"); }));
+  ["dragleave", "drop"].forEach((ev) => zone.addEventListener(ev, (e) => { e.preventDefault(); zone.classList.remove("over"); }));
+  zone.addEventListener("drop", (e) => handler(e.dataTransfer.files));
+}
+
+$("#imgInput").addEventListener("change", (e) => { addImages(e.target.files); e.target.value = ""; });
+$("#vidInput").addEventListener("change", (e) => { setVideo(e.target.files); e.target.value = ""; });
+wireDrop($("#imgDrop"), addImages);
+wireDrop($("#vidDrop"), setVideo);
+$("#vidRemove").addEventListener("click", () => { if (state.busy) return; state.video = null; setNote("vidNote", ""); renderVideo(); });
+
+// Remember the username on this device.
+try { $("#pseudo").value = localStorage.getItem("pseudo") || ""; } catch (_) {}
+
+$("#form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  if (state.busy) return;
+  const pseudo = $("#pseudo").value.trim().replace(/\s+/g, " ");
+  if (pseudo.length < 2) { setNote("formNote", "Please enter your in-game username (at least 2 characters)."); $("#pseudo").focus(); return; }
+  if (!state.images.length && !state.video) { setNote("formNote", "Please add at least one image or a video."); return; }
+  setNote("formNote", "");
+  try { localStorage.setItem("pseudo", pseudo); } catch (_) {}
+
+  state.busy = true;
+  $("#fs").disabled = true;
+  $("#send").textContent = "Uploading…";
+  try {
+    await run(pseudo);
+    state.images.forEach((i) => URL.revokeObjectURL(i.url));
+    state.images = []; state.video = null;
+    renderImages(); renderVideo();
+  } catch (err) {
+    console.error(err);
+    const li = document.createElement("li");
+    li.className = "error";
+    li.textContent = err.message + " Some files may have already been uploaded prior to the error.";
+    $("#log").append(li);
+  } finally {
+    state.busy = false;
+    $("#fs").disabled = false;
+    $("#send").textContent = "Submit";
+  }
+});
+
+renderImages();
+</script>
 </body>
 </html>
